@@ -1,0 +1,97 @@
+---
+title: "Prediction Assignment Writeup"
+author: "Marina. K"
+date: "2018.10.31"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+This is a report for assignment of Practical Machine Learning course in Coursera.
+XXX
+
+## 0. Environmental Setting
+Loading packages that I will use in this analysis.
+```{r echo = TRUE}
+library(caret)
+library(corrplot)
+library(dplyr)
+library(rattle)
+library(rpart)
+library(randomForest)
+```
+
+## 1. Data Preparetion
+### 1-1.Data Loading
+```{r echo=TRUE}
+training_data <- read.csv("./data/pml-training.csv", header = T)
+testing_data <- read.csv("./data/pml-testing.csv", header = T)
+```
+
+### 1-2.Data Cleansing
+There are some colums in testing data. It would be not used in our practice, hence I will remove those colums from testing data set and training data set. In addition to that, I want to use "randomForest" pacakage in the following model building, the package has limitation of data(53 factors), so I will compress the data to the 53colums(variables). Hence I will cut off first 7 columns that seems to be non-quantitive values.
+
+And also, I will remove all NA rows from training data because it is harmful to building the model.
+```{r, echo = TRUE}
+eliminateFactors <- names(testing_data[,colSums(is.na(testing_data)) == 0])[8:59]
+training_data1 <- training_data[,c(eliminateFactors,"classe")]
+testing_data1 <- testing_data[,c(eliminateFactors,"problem_id")]
+training_data1 <- na.omit(training_data1)
+dim(training_data1)
+dim(testing_data1)
+```
+Then, column names in data are following;
+```{r echo=TRUE}
+names(testing_data1)
+```
+Next I will split the training data set to portion of "training set" and "testing set". By using the method of "Random subsampling", I will do cross validation. Then, I will split data as training set 60% of all training data, and difine the remainings are testing set. This "testing set" is simlilar name with "testing data" that I loaded before, but it explicityly different.
+
+```{r echo= TRUE}
+set.seed(1123)
+inTrain <- createDataPartition(training_data1$classe, p=0.6, list=FALSE)
+training <- training_data1[inTrain,]
+testing <- training_data1[-inTrain,]
+
+dim(training)
+dim(testing)
+```
+## 2. Model Building
+### 2-1. With Random Forest Method
+I tried to use "caret" but it does not work well because of heavy load. Then, instead of caret, I will use "randomForest" package that directly lead the prediction by using random forest method.
+```{r echo=T}
+set.seed(1123)
+modFitRFM <- randomForest(classe ~ ., data = training, ntree = 1000)
+modFitRFM
+
+prediction <- predict(modFitRFM, testing, type = "class")
+confusionMatrix(prediction, testing$classe)
+```
+From abve consequence, "Balanced Accuracy" is 0.9990, it is very high. Accuracy of 99.9% is almost 100%.
+It seems to be great model to predicting, but I still try to find out whether much better model is exit or not.
+
+### 2-2. With Decision Tree Model
+Next, I will use "Decision Tree Model" to construct a predictive model.
+```{r echo=TRUE}
+set.seed(1123)
+modFitDTM <- rpart(classe ~ ., data=training, method="class")
+fancyRpartPlot(modFitDTM)
+modFitDTM
+
+prediction2 <- predict(modFitDTM, newdata=testing, type="class")
+cM_DTM <- confusionMatrix(prediction2, testing$classe)
+cM_DTM
+```
+From abve consequence, "Balanced Accuracy" is 0.9059, it is high enogh but smaller than with "random forest model'. And also, R warns that "there is over fitting", hence I choose this former one.
+
+## 3. Testing with Random Forest Model
+I decided to choose the prediction model that made by using "Random Forest Model", because of high accuracy.
+And finally, I will carry out prediction on 20 "test case".
+```{r echo=TRUE}
+prediction_RFM <- predict(modFitRFM, testing_data1, type = "class")
+prediction_RFM
+```
+The answer is above. It's accuracy is 99.9%.
